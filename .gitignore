@@ -1,0 +1,35 @@
+# Java
+*.class
+*.jar
+*.war
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node
+node_modules/
+dist/
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# 不入库的参考资源
+agent-skills/
+
+# 构建产物
+build/
+out/
