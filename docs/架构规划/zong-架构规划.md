@@ -16,16 +16,17 @@
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐              │
 │  │   frontend  │     │   gateway   │     │   shared    │              │
 │  │   (React)   │────▶│  (鉴权/路由) │────▶│  (通用组件)  │              │
-│  └─────────────┘     └─────────────┘     └─────────────┘              │
-│                              │                                          │
-│         ┌────────────────────┼────────────────────┐                     │
-│         │                    │                    │                     │
-│         ▼                    ▼                    ▼                     │
-│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐              │
-│  │   services  │     │   services  │     │   services  │              │
-│  │    agent    │     │  knowledge  │     │ community  │              │
-│  │  (AI Agent) │     │   (RAG)     │     │  (社区)     │              │
-│  └─────────────┘     └─────────────┘     └─────────────┘              │
+│  └─────────────┘     └─────────────┘     │  + 统一AI层 │              │
+│                              │           └─────────────┘              │
+│                              │                  │                      │
+│         ┌────────────────────┼──────────────────┼────────────────┐     │
+│         │                    │                  │                │     │
+│         ▼                    ▼                  ▼                ▼     │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐ ┌──────────┐ │
+│  │   services  │     │   services  │     │   services  │ │ services │ │
+│  │    agent    │     │  knowledge  │     │ community   │ │ shared/  │ │
+│  │  (AI Agent) │     │   (RAG)     │     │  (社区)     │ │   ai    │ │
+│  └─────────────┘     └─────────────┘     └─────────────┘ └──────────┘ │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -55,6 +56,29 @@
 |------|------|
 | **技术栈** | 通用组件库 |
 | **定位** | 被所有服务共享的基础组件 |
+| **复用来源** | zhishiku paicoding-core + PaiCLI LlmClient |
+
+#### 2.3.1 统一 AI 调用层（shared/ai）
+
+```
+shared/ai/
+├── LlmClient.java              # 接口定义（来自 PaiCLI）
+├── SpringAiLlmClient.java      # Spring AI Alibaba 实现
+├── LlmFactory.java            # 工厂模式（来自 zhishiku）
+└── models/
+    ├── ChatGPTModel.java       # OpenAI GPT
+    ├── DeepSeekModel.java      # DeepSeek
+    └── ZhipuModel.java        # 智谱 GLM
+```
+
+#### 2.3.2 通用组件（shared/cache, shared/async, shared/trace）
+
+| 组件 | 说明 |
+|------|------|
+| Redis 封装 | Pipeline 批处理、缓存穿透防护 |
+| 异步执行框架 | 注解式异步、超时控制 |
+| 链路追踪 | AOP + MDC + TraceID |
+| 敏感词过滤 | 敏感词检测与替换 |
 
 ### 2.4 services/agent
 
@@ -221,14 +245,57 @@ services/knowledge/
 
 ## 5. services/community 详细设计
 
-**暂不深入规划，作为备用资料库。**
+### 5.1 架构图
 
-| 模块 | 复用来源 | 状态 |
-|------|---------|------|
-| 文章管理 | zhishiku | ⏳ 需要时再回溯 |
-| 评论互动 | zhishiku | ⏳ 需要时再回溯 |
-| Markdown 处理 | zhishiku | ⏳ 需要时再回溯 |
-| 敏感词过滤 | zhishiku | ⏳ 需要时再回溯 |
+```
+用户 ──▶ 前端 ──▶ CommunityController
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │ Article  │   │ Comment  │   │ Markdown │
+    │ Service  │   │ Service  │   │ Service  │
+    └──────────┘   └──────────┘   └──────────┘
+          │               │               │
+          ▼               ▼               ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │  MySQL   │   │  MySQL   │   │  Parser  │
+    └──────────┘   └──────────┘   └──────────┘
+```
+
+### 5.2 模块结构
+
+```
+services/community/
+├── article/
+│   ├── ArticleController.java       # REST API
+│   ├── ArticleService.java          # 服务接口
+│   └── ArticleServiceImpl.java      # 服务实现
+├── comment/
+│   ├── CommentController.java       # REST API
+│   ├── CommentService.java          # 服务接口
+│   └── CommentServiceImpl.java      # 服务实现
+├── markdown/
+│   ├── MarkdownParser.java           # Markdown 解析
+│   ├── CodeHighlightExtension.java  # 代码高亮
+│   └── TocGenerator.java           # 目录生成
+├── interaction/
+│   ├── FavoriteService.java         # 收藏
+│   ├── FollowService.java           # 关注
+│   └── NotifyService.java           # 通知
+└── user/
+    └── UserService.java             # 用户相关
+```
+
+### 5.3 复用决策汇总
+
+| 模块 | 决策 | 说明 |
+|------|------|------|
+| 文章管理 | ✅ 直接迁移 | CRUD、分类、标签、搜索 |
+| 评论互动 | ✅ 直接迁移 | 嵌套回复、点赞 |
+| Markdown 处理 | ✅ 直接迁移 | 代码高亮、目录生成 |
+| 收藏/关注 | ✅ 直接迁移 | 用户互动逻辑 |
+| 通知系统 | ✅ 直接迁移 | 消息通知 |
 
 ---
 
