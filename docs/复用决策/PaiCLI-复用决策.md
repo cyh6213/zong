@@ -13,14 +13,17 @@
 | 模块 | 决策 | 说明 |
 |------|------|------|
 | LlmClient 接口 | ⚠️ 调整后复用 | 保留接口，换 Spring AI Alibaba 实现 |
-| 三条执行路径 | ✅ 直接复用 | ReAct / Plan / MultiAgent |
-| MemoryManager | ✅ 直接复用 | 短期/长期/压缩分层 |
+| ReAct 执行路径 | ✅ 直接复用 | Agent.java 单代理循环 |
+| Plan 执行路径 | ✅ 直接复用 | PlanExecuteAgent.java |
+| AgentOrchestrator | 🔧 需改进 | Multi-Agent 编排需增强 |
+| MemoryManager | 🔧 需改进 | 长期记忆和压缩策略需优化 |
 | ToolRegistry | ✅ 直接复用 | 工具注册 + 并行执行 |
 | AgentBudget | ✅ 直接复用 | Token 预算管理 |
 | 流式渲染 | ⚠️ 调整后复用 | CLI 流式 → Web SSE |
 | MCP 客户端 | ✅ 复用 | stdio/HTTP 传输层通用 |
 | CLI/TUI 渲染 | ❌ 不复用 | zong 是 Web 应用 |
 | HITL 审批 | ⚠️ 按需复用 | 需调整到 Web 审批流程 |
+| RAG 检索 | 🔧 需改进 | 代码解析保留，专业 RAG 用 PaiSmart |
 
 ---
 
@@ -111,6 +114,84 @@ public class McpClient {
 **复用理由：**
 - MCP 是开放协议，传输层代码通用
 - zong 可以调用外部 MCP Server
+
+---
+
+### 🔧 需改进
+
+#### 1. AgentOrchestrator（Multi-Agent 编排）
+
+```
+PAICLI 原设计                          ZONG 改进方向
+─────────────────────────────────────────────────────────────────
+Planner + Worker + Reviewer           增强版 Multi-Agent
+├── 固定三角色                         ├── 角色可配置
+├── 简单结果传递                       ├── 共享 Memory
+└── 串行 Reviewer                     └── 并行 Reviewer
+```
+
+**改进点：**
+- 多 Agent 间共享 Memory，而非独立记忆
+- Reviewer 可以并行审查多个 Worker 结果
+- 支持子 Agent 池（类似 PaiCLI Worker 池但更灵活）
+- 增加 Agent 间的消息传递机制
+
+---
+
+#### 2. MemoryManager
+
+```
+PAICLI 原设计                          ZONG 改进方向
+─────────────────────────────────────────────────────────────────
+ConversationMemory                    改进版 MemoryManager
+├── 简单消息列表                       ├── 支持多模态（图片/文件）
+├── 固定窗口截断                       ├── 智能摘要（不只是截断）
+└── SQLite LongTermMemory             └── 对接 services/knowledge（专业 RAG）
+```
+
+**改进点：**
+- **短期记忆**：支持多模态内容（不只是文本）
+- **上下文压缩**：不只是简单截断，需要智能摘要（可用 LLM）
+- **长期记忆**：不自己实现 RAG，对接 `services/knowledge` 的专业 RAG
+- **记忆检索**：基于语义检索而非简单关键词
+
+---
+
+#### 3. RAG 检索
+
+```
+PAICLI RAG（代码专用）                  PaiSmart RAG（文档专业）
+─────────────────────────────────────────────────────────────────
+CodeChunker                            VectorizationService
+├── 基于 AST 分块                      ├── Tika 文档解析
+├── 简单 import 分析                   ├── HanLP 中文分词
+└── SQLite VectorStore                 └── Elasticsearch 向量搜索
+```
+
+**复用策略：**
+
+| 组件 | 决策 | 说明 |
+|------|------|------|
+| `CodeChunker` | ✅ 保留 | 代码解析逻辑通用 |
+| `CodeRetriever` | ✅ 保留 | 检索思路可复用 |
+| `VectorStore` | ❌ 替换 | 换用 Elasticsearch |
+| 文档解析 | ✅ 用 PaiSmart | Tika + HanLP 流水线 |
+| 向量搜索 | ✅ 用 PaiSmart | Elasticsearch 混合搜索 |
+| RAG 权限过滤 | ✅ 用 PaiSmart | OrgTag 权限控制 |
+
+**改进后架构：**
+```
+services/agent/                         services/knowledge/
+─────────────────                       ──────────────────
+RAG 检索入口                              专业 RAG 实现
+     │                                        │
+     ▼                                        ▼
+CodeRetriever ◄────── 对接 ──────────► VectorizationService
+(代码检索)                                  (Tika + ES + 权限)
+     │                                        │
+     ▼                                        ▼
+Agent Memory                              统一向量索引
+```
 
 ---
 
@@ -208,22 +289,30 @@ services/agent/
 │   ├── agent/
 │   │   ├── Agent.java                  # 直接移植
 │   │   ├── PlanExecuteAgent.java      # 直接移植
-│   │   ├── AgentOrchestrator.java     # 直接移植
+│   │   ├── AgentOrchestrator.java     # 🔧 需改进：增强 Multi-Agent
 │   │   └── AgentBudget.java           # 直接移植
 │   └── memory/
-│       ├── MemoryManager.java          # 直接移植
-│       ├── ConversationMemory.java    # 直接移植
-│       ├── LongTermMemory.java        # 存储层替换
-│       └── ContextCompressor.java     # 直接移植
+│       ├── MemoryManager.java          # 🔧 需改进：智能压缩 + 对接 knowledge
+│       ├── ConversationMemory.java     # 直接移植
+│       ├── LongTermMemory.java        # 🔧 改进：对接 services/knowledge
+│       └── ContextCompressor.java     # 🔧 需改进：智能摘要
 ├── tool/
 │   ├── ToolRegistry.java              # 直接移植
 │   └── plugins/
-│       ├── KnowledgeTool.java          # 新增
+│       ├── KnowledgeTool.java          # 🔧 改进：对接 services/knowledge
 │       ├── FileTool.java              # 新增
-│       └── M cpTool.java             # 来自 PaiCLI 调整
+│       └── McpTool.java              # 来自 PaiCLI 调整
 └── api/
     ├── AgentController.java            # 新增（REST API）
     └── AgentSseController.java         # 新增（SSE 流式）
+
+services/knowledge/                      # 🔧 RAG 核心
+├── rag/
+│   ├── VectorizationService           # 来自 PaiSmart（Tika + HanLP）
+│   ├── HybridSearchService            # 来自 PaiSmart（向量 + 关键词）
+│   └── RagPermissionFilter            # 来自 PaiSmart（OrgTag 权限）
+└── index/
+    └── CodeRetriever.java             # 来自 PaiCLI（保留代码检索）
 ```
 
 ---
