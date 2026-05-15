@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - community
+      - knowledge
+      - agent
+
+  community:
+    build:
+      context: ../services/community
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+
+  knowledge:
+    build:
+      context: ../services/knowledge
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+
+  agent:
+    build:
+      context: ../services/agent
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
