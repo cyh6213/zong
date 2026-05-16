@@ -126,6 +126,65 @@ services/agent/src/main/java/com/zong/agent/
 
 ---
 
+## 阶段1补充：pom.xml 添加 lanterna 依赖
+
+**变更类型**：修改
+
+**变更说明**：
+- 添加 lanterna 依赖（3.1.1），用于 TUI 界面编译
+
+**相关文件**：
+- `services/agent/pom.xml`
+
+**状态**：✅ 已完成
+
+---
+
+## 阶段1补充：修复 TuiConfigPanel.java 导入路径
+
+**变更类型**：修改
+
+**变更说明**：
+- 修复导入路径：`com.zong.config.PaiCliConfig` → `com.zong.agent.config.PaiCliConfig`
+
+**相关文件**：
+- `services/agent/src/main/java/com/zong/agent/tui/config/TuiConfigPanel.java`
+
+**状态**：✅ 已完成
+
+---
+
+## 阶段3：RAG 功能改造 ✅ 已完成
+
+### 变更：新增 KnowledgeRagTool（调用 knowledge HTTP API）
+
+**变更类型**：新增
+
+**变更说明**：
+- 新增 `KnowledgeRagTool.java`：通过 HTTP API 调用 services/knowledge 的 RAG 检索
+- 新增 `WebClientConfig.java`：配置 knowledge 服务的 WebClient
+- 新增 `KnowledgeRetrieveRequest.java`：检索请求 DTO
+- 新增 `KnowledgeRetrieveResponse.java`：检索响应 DTO
+- 更新 `application.yml`：添加 knowledge-service-url 配置
+
+**API 规范**：
+- 端点：`POST /api/knowledge/retrieve`
+- 请求：`{ "query": "...", "topK": 5, "orgTag": "..." }`
+- 响应：`{ "code": 0, "data": { "results": [...] } }`
+
+**相关文件**：
+- `services/agent/src/main/java/com/zong/agent/tool/plugins/KnowledgeRagTool.java`
+- `services/agent/src/main/java/com/zong/agent/config/WebClientConfig.java`
+- `services/agent/src/main/java/com/zong/agent/dto/KnowledgeRetrieveRequest.java`
+- `services/agent/src/main/java/com/zong/agent/dto/KnowledgeRetrieveResponse.java`
+- `services/agent/src/main/resources/application.yml`
+
+**状态**：✅ 已完成
+
+**备注**：依赖 knowledge 服务的 `/api/knowledge/retrieve` 接口实现后联调
+
+---
+
 ## 待办事项
 
 ### 阶段2：DAG JSON 解析功能实现
