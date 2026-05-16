@@ -185,6 +185,54 @@ services/agent/src/main/java/com/zong/agent/
 
 ---
 
+## 阶段4：SSE 流式输出和 REST API ✅ 已完成
+
+### 变更：新增 Agent API 控制器和流式监听器
+
+**变更类型**：新增
+
+**变更说明**：
+- 新增 `StreamListener.java`：流式输出监听器接口
+- 新增 `SseStreamListener.java`：SSE 实现（推送 thinking_delta、content_delta、workflow_json、done、error 事件）
+- 新增 `AgentController.java`：REST API 控制器（非流式对话、工作流执行、状态查询）
+- 新增 `AgentSseController.java`：SSE 流式输出控制器
+- 新增 DTO：`AgentChatRequest`、`AgentChatResponse`、`WorkflowExecuteRequest`、`WorkflowStatusResponse`
+
+**接口规范**：
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/agent/chat` | POST | 非流式对话 |
+| `/api/agent/chat/stream` | POST | 流式对话（SSE） |
+| `/api/agent/workflow/execute` | POST | 执行工作流 |
+| `/api/agent/workflow/status/{id}` | GET | 查询执行状态 |
+| `/api/agent/health` | GET | 健康检查 |
+
+**SSE 事件**：
+- `thinking_delta`：思考内容片段
+- `content_delta`：回复内容片段
+- `workflow_json`：DAG 图 JSON
+- `done`：完成
+- `error`：错误
+
+**相关文件**：
+- `services/agent/src/main/java/com/zong/agent/api/AgentController.java`
+- `services/agent/src/main/java/com/zong/agent/api/AgentSseController.java`
+- `services/agent/src/main/java/com/zong/agent/llm/StreamListener.java`
+- `services/agent/src/main/java/com/zong/agent/llm/SseStreamListener.java`
+- `services/agent/src/main/java/com/zong/agent/dto/AgentChatRequest.java`
+- `services/agent/src/main/java/com/zong/agent/dto/AgentChatResponse.java`
+- `services/agent/src/main/java/com/zong/agent/dto/WorkflowExecuteRequest.java`
+- `services/agent/src/main/java/com/zong/agent/dto/WorkflowStatusResponse.java`
+
+**状态**：✅ 已完成
+
+**备注**：
+- Agent 核心逻辑待实现（依赖 T002、T003）
+- DAG 执行引擎待实现（依赖 T009）
+- 当前为框架实现，实际逻辑需后续集成
+
+---
+
 ## 待办事项
 
 ### 阶段2：DAG JSON 解析功能实现
@@ -194,18 +242,18 @@ services/agent/src/main/java/com/zong/agent/
 - [ ] 实现 DAG 执行引擎（参考 PaiFlow 的 WorkflowEngine）
 - [ ] 实现 DAG → JSON 转换（新增，用于推送给前端）
 
-### 阶段3：RAG 功能改造
+### 阶段3：RAG 功能改造 ✅ 已完成
 
-- [ ] 删除 PaiCLI 原生 RAG 代码（`rag/` 包）
-- [ ] 新增 `KnowledgeRagTool`（调用 services/knowledge HTTP API）
-- [ ] 实现 WebClient 配置（`WebClientConfig.java`）
+- [x] 删除 PaiCLI 原生 RAG 代码（`rag/` 包）- 无需删除，移植时未复制
+- [x] 新增 `KnowledgeRagTool`（调用 services/knowledge HTTP API）
+- [x] 实现 WebClient 配置（`WebClientConfig.java`）
 
-### 阶段4：SSE 流式输出和 REST API
+### 阶段4：SSE 流式输出和 REST API ✅ 已完成
 
-- [ ] 改造 `render/` 包（替换 CLI 渲染为 SSE 输出）
-- [ ] 创建 `AgentController.java`（REST API）
-- [ ] 创建 `AgentSseController.java`（SSE 流式输出）
-- [ ] 适配 `StreamListener` 接口（输出 SSE 事件）
+- [x] 改造 `render/` 包（替换 CLI 渲染为 SSE 输出）- 改用 SseStreamListener
+- [x] 创建 `AgentController.java`（REST API）
+- [x] 创建 `AgentSseController.java`（SSE 流式输出）
+- [x] 适配 `StreamListener` 接口（输出 SSE 事件）
 
 ---
 
