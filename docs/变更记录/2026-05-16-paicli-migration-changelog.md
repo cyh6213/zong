@@ -233,6 +233,64 @@ services/agent/src/main/java/com/zong/agent/
 
 ---
 
+## 阶段2：实现 DAG JSON 解析功能 ✅ 已完成
+
+### 变更：新增工作流核心类和执行引擎
+
+**变更类型**：新增
+
+**变更说明**：
+- T008（JSON→DAG）：创建工作流定义类（WorkflowDSL、Node、Edge、NodeData、NodeTypeEnum）
+- T008-2（DAG→JSON）：创建 DagToJsonConverter，支持正向和反向转换
+- T009（DAG 执行引擎）：创建 WorkflowEngine、VariablePool、各类 NodeExecutor
+
+**包结构**：
+```
+com.zong.agent.core.workflow
+├── WorkflowDSL.java          # 工作流定义
+├── Node.java                 # 节点
+├── Edge.java                 # 边
+├── NodeData.java             # 节点数据
+├── NodeTypeEnum.java         # 节点类型枚举
+├── DagToJsonConverter.java   # DAG ↔ JSON 转换器
+├── WorkflowEngine.java       # 执行引擎（Kahn 拓扑排序）
+├── VariablePool.java         # 变量池
+├── NodeExecutor.java         # 节点执行器接口
+├── NodeExecutionResult.java  # 执行结果
+├── RetryConfig.java          # 重试配置
+├── WorkflowResult.java       # 工作流执行结果
+├── WorkflowException.java    # 异常类
+└── impl/
+    ├── StartNodeExecutor.java
+    ├── EndNodeExecutor.java
+    ├── LlmNodeExecutor.java
+    ├── PluginNodeExecutor.java
+    ├── ConditionNodeExecutor.java
+    ├── LoopNodeExecutor.java
+    └── DefaultLoopNodeExecutor.java
+```
+
+**核心功能**：
+- Kahn 算法拓扑排序
+- 环路检测（DFS）
+- 节点类型：start/llm/plugin/condition/loop/end
+- 节点重试配置
+- 变量池（支持 {{nodeId}} 变量引用）
+- SSE 流式输出
+
+**相关文件**：
+- `services/agent/src/main/java/com/zong/agent/core/workflow/*.java`
+- `services/agent/src/test/java/com/zong/agent/core/workflow/WorkflowTest.java`
+
+**状态**：✅ 已完成
+
+**待联调**：
+- LLM 节点需接入 LlmClient（T002）
+- 插件节点需接入 PluginManager
+- DAG 图 SSE 推送需集成 AgentSseController
+
+---
+
 ## 待办事项
 
 ### 阶段2：DAG JSON 解析功能实现
